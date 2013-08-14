@@ -42,9 +42,8 @@ To evolve the concept of an [angularjs](http://angularjs.org/) [***route***](htt
 
 * [In-Depth Overview](https://github.com/angular-ui/ui-router/wiki)
 * [API Quick Reference](https://github.com/angular-ui/ui-router/wiki/Quick-Reference)
-* [FAQ](https://github.com/angular-ui/ui-router/wiki/Frequently-Asked-Questions)
 * [Sample App](http://angular-ui.github.com/ui-router/sample/) ([Source](https://github.com/angular-ui/ui-router/tree/master/sample))
-* [Generated Docs](http://angular-ui.github.com/ui-router/build/doc/)
+* [FAQ](https://github.com/angular-ui/ui-router/wiki/Frequently-Asked-Questions)
 
 ## Quick Start
 
@@ -65,10 +64,10 @@ To evolve the concept of an [angularjs](http://angularjs.org/) [***route***](htt
       <script src="angular-ui-router.min.js"></script> <!-- Insert after main angular.js file -->
 ```
 
-2. Set `ui.state` as a dependency in your module
+2. Set `ui.router` as a dependency in your module
 >
 ```javascript
-var myapp = angular.module('myapp', ['ui.state']) 
+var myapp = angular.module('myapp', ['ui.router'])
 ```
 
 ### Nested States & Views
@@ -186,7 +185,7 @@ Another handy feature is the ability to have more than one view per template. Pl
 3. Set up your states in the module config:
 >
 ```javascript
-myapp.config(function($stateProvider, $routeProvider){
+myapp.config(function($stateProvide){
   $stateProvider
 		.state('index', {
 			url: "", // root route

@@ -1,8 +1,8 @@
 describe('state', function () {
 
-  var locationProvider;
+  var locationProvider, templateParams;
 
-  beforeEach(module('ui.state', function($locationProvider) {
+  beforeEach(module('ui.router', function($locationProvider) {
     locationProvider = $locationProvider;
     $locationProvider.html5Mode(false);
   }));
@@ -50,7 +50,14 @@ describe('state', function () {
       .state('about', { url: "/about" })
       .state('about.person', { url: "/:person" })
       .state('about.person.item', { url: "/:id" })
-      .state('about.sidebar', {});
+      .state('about.sidebar', {})
+      .state('about.sidebar.item', {
+        url: "/:item",
+        templateUrl: function(params) {
+          templateParams = params;
+          return "/templates/" + params.item + ".html";
+        }
+      });
 
     $provide.value('AppInjectable', AppInjectable);
   }));
@@ -210,6 +217,54 @@ describe('state', function () {
     }));
   });
 
+  describe('.go()', function() {
+    it('transitions to a relative state', inject(function ($state, $q) {
+      $state.transitionTo('about.person.item', { id: 5 }); $q.flush();
+      $state.go('^.^.sidebar'); $q.flush();
+      expect($state.$current.name).toBe('about.sidebar');
+
+      // Transitions to absolute state
+      $state.go("home"); $q.flush();
+      expect($state.$current.name).toBe('home');
+
+
+      // Transition to a child state
+      $state.go(".item", { id: 5 }); $q.flush();
+      expect($state.$current.name).toBe('home.item');
+
+      // Transition to grandparent's sibling through root
+      // (Equivalent to absolute transition, assuming the root is known).
+      $state.go("^.^.about"); $q.flush();
+      expect($state.$current.name).toBe('about');
+
+      // Transition to grandchild
+      $state.go(".person.item", { person: "bob", id: 13 }); $q.flush();
+      expect($state.$current.name).toBe('about.person.item');
+
+      // Transition to immediate parent
+      $state.go("^"); $q.flush();
+      expect($state.$current.name).toBe('about.person');
+
+      // Transition to sibling
+      $state.go("^.sidebar"); $q.flush();
+      expect($state.$current.name).toBe('about.sidebar');
+    }));
+
+    it('keeps parameters from common ancestor states', inject(function ($state, $stateParams, $q) {
+      $state.transitionTo('about.person', { person: 'bob' });
+      $q.flush();
+
+      $state.go('.item', { id: 5 });
+      $q.flush();
+
+      expect($state.$current.name).toBe('about.person.item');
+      expect($stateParams).toEqual({ person: 'bob', id: '5' });
+
+      $state.go('^.^.sidebar');
+      $q.flush();
+      expect($state.$current.name).toBe('about.sidebar');
+    }));
+  });
 
   describe('.current', function () {
     it('is always defined', inject(function ($state) {
@@ -287,6 +342,15 @@ describe('state', function () {
     }));
   });
 
+  describe('.getConfig()', function () {
+    it("should return the state's config", inject(function ($state) {
+      expect($state.getConfig('home').url).toBe('/');
+      expect($state.getConfig('home.item').url).toBe('front/:id');
+      expect($state.getConfig('A')).toBe(A);
+      expect(function() { $state.getConfig('Z'); }).toThrow("No such state 'Z'");
+    }));
+  });
+
   describe(' "data" property inheritance/override', function () {
     it('"data" property should stay immutable for if state doesn\'t have parent', inject(function ($state) {
       initStateTo(H);
@@ -318,6 +382,93 @@ describe('state', function () {
       expect($state.href("about.person", { person: "bob" })).toEqual("#/about/bob");
       locationProvider.html5Mode(true);
       expect($state.href("about.person", { person: "bob" })).toEqual("/about/bob");
+    }));
+  });
+
+  describe('url handling', function () {
+
+    it('should transition to the same state with different parameters', inject(function ($state, $rootScope, $location) {
+      $location.path("/about/bob");
+      $rootScope.$broadcast("$locationChangeSuccess");
+      $rootScope.$apply();
+      expect($state.params).toEqual({ person: "bob" });
+
+      $location.path("/about/larry");
+      $rootScope.$broadcast("$locationChangeSuccess");
+      $rootScope.$apply();
+      expect($state.params).toEqual({ person: "larry" });
+    }));
+  });
+
+  describe('default properties', function() {
+    it('should always have a name', inject(function ($state, $q) {
+      $state.transitionTo(A);
+      $q.flush();
+      expect($state.$current.name).toBe('A');
+      expect($state.$current.toString()).toBe('A');
+    }));
+
+    it('should always have a resolve object', inject(function ($state) {
+      expect($state.$current.resolve).toEqual({});
+    }));
+  });
+
+  describe(' "data" property inheritance/override', function () {
+    it('"data" property should stay immutable for if state doesn\'t have parent', inject(function ($state) {
+      initStateTo(H);
+      expect($state.current.name).toEqual('H');
+      expect($state.current.data.propA).toEqual(H.data.propA);
+      expect($state.current.data.propB).toEqual(H.data.propB);
+    }));
+
+    it('"data" property should be inherited from parent if state doesn\'t define it', inject(function ($state) {
+      initStateTo(HH);
+      expect($state.current.name).toEqual('HH');
+      expect($state.current.data.propA).toEqual(H.data.propA);
+      expect($state.current.data.propB).toEqual(H.data.propB);
+    }));
+
+    it('"data" property should be overridden/extended if state defines it', inject(function ($state) {
+      initStateTo(HHH);
+      expect($state.current.name).toEqual('HHH');
+      expect($state.current.data.propA).toEqual(HHH.data.propA);
+      expect($state.current.data.propB).toEqual(H.data.propB);
+      expect($state.current.data.propB).toEqual(HH.data.propB);
+      expect($state.current.data.propC).toEqual(HHH.data.propC);
+    }));
+  });
+
+  describe('html5Mode compatibility', function() {
+
+    it('should generate non-hashbang URLs in HTML5 mode', inject(function ($state) {
+      expect($state.href("about.person", { person: "bob" })).toEqual("#/about/bob");
+      locationProvider.html5Mode(true);
+      expect($state.href("about.person", { person: "bob" })).toEqual("/about/bob");
+    }));
+  });
+
+  describe('default properties', function () {
+    it('should always have a name', inject(function ($state, $q) {
+      $state.transitionTo(A); $q.flush();
+      expect($state.$current.name).toBe('A');
+      expect($state.$current.toString()).toBe('A');
+    }));
+
+    it('should always have a resolve object', inject(function ($state) {
+      expect($state.$current.resolve).toEqual({});
+    }));
+
+    it('should include itself and parent states', inject(function ($state, $q) {
+      $state.transitionTo(DD); $q.flush();
+      expect($state.$current.includes).toEqual({ '': true, D: true, DD: true });
+    }));
+  });
+
+  describe('template handling', function () {
+    it('should inject $stateParams into templateUrl function', inject(function ($state, $q, $httpBackend) {
+      $httpBackend.expectGET("/templates/foo.html").respond("200");
+      $state.transitionTo('about.sidebar.item', { item: "foo" }); $q.flush();
+      expect(templateParams).toEqual({ item: "foo" });
     }));
   });
 });
