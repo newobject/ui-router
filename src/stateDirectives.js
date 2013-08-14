@@ -9,7 +9,17 @@ function $StateRefDirective($state) {
   return {
     restrict: 'A',
     link: function(scope, element, attrs) {
-      var ref = parseStateRef(attrs.uiSref);
+      var ref;
+
+      if(attrs.state){
+        ref = {
+          state: scope.$eval(attrs.state),
+          paramExpr: null
+        };
+      }else{
+        ref = parseStateRef(attrs.uiSref);
+      }
+       
       var params = null, url = null;
       var isForm = element[0].nodeName === "FORM";
       var attr = isForm ? "action" : "href", nav = true;

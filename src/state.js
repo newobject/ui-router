@@ -263,6 +263,8 @@ function $StateProvider(   $urlRouterProvider,   $urlMatcherFactory,           $
       return transition;
     };
 
+    $state.findState = findState;
+
     $state.is = function (stateOrName) {
       return $state.$current === findState(stateOrName);
     };
